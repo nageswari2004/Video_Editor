@@ -17,8 +17,8 @@ Benefits of FFmpeg-only approach:
 - Smaller dependency footprint
 - Production-ready performance
 
-Note: External integrations (YouTube, Pexels, Dailymotion) still use MoviePy
-for compatibility with their APIs, but core functionality is FFmpeg-based.
+All video processing operations now use FFmpeg for optimal performance and reliability.
+External integrations (YouTube, Pexels, Dailymotion) also use FFmpeg for video merging.
 """
 
 from flask import Flask, request, jsonify, render_template, send_from_directory, redirect, url_for, session, flash
@@ -60,9 +60,9 @@ IMAGEMAGICK_PATH = r"C:\Program Files\ImageMagick-7.1.1-Q16-HDRI\magick.exe"
 # API configurations
 PEXELS_API_KEY = os.getenv('PEXELS_API_KEY')
 
-# NOTE: MoviePy has been removed from core functionality
-# External integrations (YouTube, Pexels, Dailymotion) still use MoviePy
-# All main video processing now uses FFmpeg for better performance
+# NOTE: All video processing now uses FFmpeg for optimal performance
+# This includes core functionality and external integrations (YouTube, Pexels, Dailymotion)
+# FFmpeg provides faster processing, lower memory usage, and better reliability
 
 # ImageMagick configuration (for text overlays if needed)
 def check_imagemagick():
@@ -593,6 +593,32 @@ def get_video_path(filename):
 
 def get_output_path(filename):
     return os.path.join(app.config['OUTPUT_FOLDER'], filename)
+
+def cleanup_files(file_paths):
+    """Safely remove a list of files"""
+    if not file_paths:
+        return
+    
+    for file_path in file_paths:
+        if file_path and os.path.exists(file_path):
+            try:
+                os.remove(file_path)
+                print(f"Debug - Cleaned up file: {file_path}")
+            except Exception as e:
+                print(f"Debug - Failed to clean up file {file_path}: {str(e)}")
+
+def cleanup_videos(video_objects):
+    """Safely close a list of video objects"""
+    if not video_objects:
+        return
+    
+    for video in video_objects:
+        if video:
+            try:
+                video.close()
+                print(f"Debug - Closed video object")
+            except Exception as e:
+                print(f"Debug - Failed to close video object: {str(e)}")
 
 # Test route
 @app.route('/test')
@@ -1174,7 +1200,7 @@ def merge_videos():
             os.remove(concat_file_path)
         return jsonify({'success': False, 'error': f'Merge error: {str(e)}'})
 
-# MoviePy-based merge-simple route removed - using FFmpeg-based merge instead
+# All video merging operations now use FFmpeg for optimal performance
 
 @app.route('/extract-audio', methods=['POST'])
 @login_required
@@ -2415,7 +2441,7 @@ def compress_video():
             'original_size': f"{original_size / (1024*1024):.1f} MB",
             'compressed_size': f"{compressed_size / (1024*1024):.1f} MB",
             'compression_ratio': compression_ratio,
-            'method': 'FFmpeg' if ffmpeg_available else 'MoviePy'
+            'method': 'FFmpeg'
         })
         
     except Exception as e:
@@ -4517,78 +4543,37 @@ def download_youtube_clip():
         
         # Use yt-dlp to download the video with enhanced options
         ydl_opts = {
-            'format': 'best[ext=mp4]',
+            'format': 'worst[ext=mp4]/worst',  # Use worst quality to avoid restrictions
             'outtmpl': output_path,
-            'verbose': True,
+            'quiet': False,  # Enable output for debugging
             'no_warnings': False,
-            'ignoreerrors': True,
-            'quiet': False,
-            'no_color': True,
+            'ignoreerrors': False,
             'extract_flat': False,
-            'force_generic_extractor': False,
-            'cookiesfrombrowser': None,
-            'cookiefile': None,
-            'nocheckcertificate': True,
-            'prefer_insecure': True,
-            'geo_bypass': True,
-            'geo_verification_proxy': None,
-            'socket_timeout': 30,
-            'retries': 3,
-            'fragment_retries': 3,
+            'socket_timeout': 60,
+            'retries': 5,
+            'fragment_retries': 5,
             'skip_unavailable_fragments': True,
             'keepvideo': False,
-            'writedescription': False,
+            'merge_output_format': 'mp4',
             'writeinfojson': False,
             'writesubtitles': False,
             'writeautomaticsub': False,
             'postprocessors': [],
-            'merge_output_format': 'mp4',
-            'updatetime': False,
-            'consoletitle': False,
-            'noprogress': False,
-            'progress_with_newline': True,
-            'progress_hooks': [],
-            'postprocessor_hooks': [],
-            'match_filter': None,
-            'source_address': None,
-            'call_home': False,
-            'sleep_interval': 0,
+            # Use mobile client which is less restricted
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android'],
+                    'skip': ['dash', 'hls']
+                }
+            },
+            # Add user agent
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Linux; Android 10; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36'
+            },
+            # Conservative sleep intervals
+            'sleep_interval_requests': 2,
+            'sleep_interval_subtitles': 2,
             'max_sleep_interval': 10,
-            'external_downloader_args': None,
-            'listformats': False,
-            'list_thumbnails': False,
-            'playlist_items': None,
-            'playlist_random': False,
-            'playlist_reverse': False,
-            'playlist_start': 1,
-            'playlist_end': None,
-            'playlist_min_files': 1,
-            'playlist_max_files': None,
-            'playlist_filters': [],
-            'age_limit': None,
-            'download_archive': None,
-            'break_on_existing': False,
-            'break_per_url': False,
-            'skip_download': False,
-            'cachedir': None,
-            'youtube_include_dash_manifest': True,
-            'youtube_include_hls_manifest': True,
-            'youtube_include_drm_manifest': True,
-            'youtube_include_webm': True,
-            'youtube_include_3d': True,
-            'youtube_include_playlist_metafiles': True,
-            'youtube_include_dash_audio': True,
-            'youtube_include_dash_video': True,
-            'youtube_include_hls_audio': True,
-            'youtube_include_hls_video': True,
-            'youtube_include_drm_audio': True,
-            'youtube_include_drm_video': True,
-            'youtube_include_webm_audio': True,
-            'youtube_include_webm_video': True,
-            'youtube_include_3d_audio': True,
-            'youtube_include_3d_video': True,
-            'youtube_include_playlist_metafiles_audio': True,
-            'youtube_include_playlist_metafiles_video': True,
         }
         
         print(f"Debug - Downloading to: {output_path}")
@@ -4683,177 +4668,201 @@ def add_youtube_to_video():
         try:
             print(f"Debug - Downloading YouTube video to: {youtube_path}")
             
-            ydl_opts = {
-                'format': 'best[ext=mp4]',
-                'outtmpl': youtube_path,
-                'verbose': True,
-                'no_warnings': False,
-                'ignoreerrors': True,
-                'quiet': False,
-                'no_color': True,
-                'extract_flat': False,
-                'force_generic_extractor': False,
-                'cookiesfrombrowser': None,
-                'cookiefile': None,
-                'nocheckcertificate': True,
-                'prefer_insecure': True,
-                'geo_bypass': True,
-                'socket_timeout': 60, # Increased socket timeout
-                'retries': 10, # Increased retries for robustness
-                'fragment_retries': 10,
-                'skip_unavailable_fragments': True,
-                'keepvideo': False,
-                'writedescription': False,
-                'writeinfojson': False,
-                'writesubtitles': False,
-                'writeautomaticsub': False,
-                'postprocessors': [],
-                'merge_output_format': 'mp4',
-                'updatetime': False,
-                'consoletitle': False,
-                'noprogress': False,
-                'progress_with_newline': True,
-                'progress_hooks': [],
-                'postprocessor_hooks': [],
-                'match_filter': None,
-                'source_address': None,
-                'call_home': False,
-                'sleep_interval': 0,
-                'max_sleep_interval': 10,
-                'external_downloader_args': None,
-                'listformats': False,
-                'list_thumbnails': False,
-                'playlist_items': None,
-                'playlist_random': False,
-                'playlist_reverse': False,
-                'playlist_start': 1,
-                'playlist_end': None,
-                'playlist_min_files': 1,
-                'playlist_max_files': None,
-                'playlist_filters': [],
-                'age_limit': None,
-                'download_archive': None,
-                'break_on_existing': False,
-                'break_per_url': False,
-                'skip_download': False,
-                'cachedir': None,
-                'youtube_include_dash_manifest': True,
-                'youtube_include_hls_manifest': True,
-                'youtube_include_drm_manifest': True,
-                'youtube_include_webm': True,
-                'youtube_include_3d': True,
-                'youtube_include_playlist_metafiles': True,
-                'youtube_include_dash_audio': True,
-                'youtube_include_dash_video': True,
-                'youtube_include_hls_audio': True,
-                'youtube_include_hls_video': True,
-                'youtube_include_drm_audio': True,
-                'youtube_include_drm_video': True,
-                'youtube_include_webm_audio': True,
-                'youtube_include_webm_video': True,
-                'youtube_include_3d_audio': True,
-                'youtube_include_3d_video': True,
-                'youtube_include_playlist_metafiles_audio': True,
-                'youtube_include_playlist_metafiles_video': True,
-            }
+            # Try multiple yt-dlp configurations for better success rate
+            configs_to_try = [
+                {
+                    'name': 'Android Client',
+                    'opts': {
+                        'format': 'worst[ext=mp4]/worst',
+                        'outtmpl': youtube_path,
+                        'quiet': True,
+                        'no_warnings': True,
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['android'],
+                                'skip': ['dash', 'hls']
+                            }
+                        },
+                        'http_headers': {
+                            'User-Agent': 'com.google.android.youtube/17.31.35 (Linux; U; Android 11) gzip'
+                        }
+                    }
+                },
+                {
+                    'name': 'Web Client',
+                    'opts': {
+                        'format': 'worst[ext=mp4]/worst',
+                        'outtmpl': youtube_path,
+                        'quiet': True,
+                        'no_warnings': True,
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['web'],
+                                'skip': ['dash', 'hls']
+                            }
+                        }
+                    }
+                },
+                {
+                    'name': 'Basic Config',
+                    'opts': {
+                        'format': 'worst[ext=mp4]/worst',
+                        'outtmpl': youtube_path,
+                        'quiet': True,
+                        'no_warnings': True,
+                    }
+                }
+            ]
             
-            try:
-                print(f"Debug - Starting YouTube download with yt-dlp")
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    # First try to extract info to verify the video exists
-                    try:
-                        info = ydl.extract_info(f'https://www.youtube.com/watch?v={video_id}', download=False)
-                        if not info:
-                            print(f"Debug - Could not extract video info")
-                            return jsonify({'success': False, 'error': 'Video not found or unavailable'})
-                    except Exception as e:
-                        print(f"Debug - Error extracting video info: {str(e)}")
-                        return jsonify({'success': False, 'error': f'Error accessing video: {str(e)}'})
+            # Try each configuration until one works
+            download_success = False
+            last_error = None
+            
+            for config in configs_to_try:
+                try:
+                    print(f"Debug - Trying {config['name']} configuration")
                     
-                    # Now try to download
-                    try:
+                    with yt_dlp.YoutubeDL(config['opts']) as ydl:
+                        # Try to download
                         ydl.download([f'https://www.youtube.com/watch?v={video_id}'])
-                    except Exception as e:
-                        print(f"Debug - Error during download: {str(e)}")
-                        if os.path.exists(youtube_path):
-                            try:
-                                os.remove(youtube_path)
-                            except:
-                                pass
-                        return jsonify({'success': False, 'error': f'Error downloading video: {str(e)}'})
-                    
-                if not os.path.exists(youtube_path):
-                    print(f"Debug - YouTube video not found after download")
-                    return jsonify({'success': False, 'error': 'Failed to download YouTube video'})
-                    
-                # Verify the file is not empty
-                if os.path.getsize(youtube_path) == 0:
-                    print(f"Debug - Downloaded YouTube file is empty")
-                    os.remove(youtube_path)
-                    return jsonify({'success': False, 'error': 'Downloaded YouTube file is empty'})
-                    
-                print(f"Debug - Successfully downloaded YouTube video")
+                        
+                        # Check if download was successful
+                        if os.path.exists(youtube_path) and os.path.getsize(youtube_path) > 0:
+                            print(f"Debug - Successfully downloaded with {config['name']}")
+                            download_success = True
+                            break
+                            
+                except Exception as e:
+                    print(f"Debug - {config['name']} failed: {str(e)}")
+                    last_error = str(e)
+                    # Clean up any partial download
+                    if os.path.exists(youtube_path):
+                        try:
+                            os.remove(youtube_path)
+                        except:
+                            pass
+                    continue
+            
+            if not download_success:
+                print(f"Debug - All YouTube download methods failed")
+                return jsonify({'success': False, 'error': f'Failed to download YouTube video. Last error: {last_error}'})
                 
-                # Load both videos
-                print(f"Debug - Loading videos for merging")
-                video1 = mp.VideoFileClip(video_path)
-                video2 = mp.VideoFileClip(youtube_path)
-                videos.extend([video1, video2]) # Add to videos list for cleanup
+            print(f"Debug - YouTube video downloaded successfully")
+            
+            # Generate output filename
+            output_filename = f'merged_youtube_{int(time.time())}.mp4'
+            output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
+            
+            print(f"Debug - Merging videos using FFmpeg")
+            
+            # Use FFmpeg to concatenate videos directly
+            try:
+                # Verify input files exist and have content
+                print(f"Debug - Verifying input files:")
+                print(f"  User video: {video_path} (exists: {os.path.exists(video_path)}, size: {os.path.getsize(video_path) if os.path.exists(video_path) else 0} bytes)")
+                print(f"  YouTube video: {youtube_path} (exists: {os.path.exists(youtube_path)}, size: {os.path.getsize(youtube_path) if os.path.exists(youtube_path) else 0} bytes)")
                 
-                # Get the highest resolution
-                target_width = max(video1.w, video2.w)
-                target_height = max(video1.h, video2.h)
+                # Create a temporary file list for FFmpeg concat
+                concat_file = os.path.join(app.config['UPLOAD_FOLDER'], f'concat_youtube_{int(time.time())}.txt')
                 
-                # Ensure dimensions are even
-                target_width = target_width - (target_width % 2)
-                target_height = target_height - (target_height % 2)
+                # First, normalize both videos to ensure compatibility
+                print(f"Debug - Normalizing videos for compatibility")
                 
-                print(f"Debug - Resizing videos to {target_width}x{target_height}")
+                # Normalize user video
+                norm_user_path = os.path.join(app.config['UPLOAD_FOLDER'], f'norm_user_{int(time.time())}.mp4')
+                cmd_norm_user = [
+                    'ffmpeg', '-y',
+                    '-i', video_path,
+                    '-c:v', 'libx264',
+                    '-c:a', 'aac',
+                    '-r', '30',
+                    '-s', '1280x720',
+                    '-pix_fmt', 'yuv420p',
+                    '-crf', '23',
+                    '-preset', 'fast',
+                    norm_user_path
+                ]
                 
-                # Resize videos to match the highest resolution
-                if video1.w != target_width or video1.h != target_height:
-                    video1 = video1.resize(width=target_width, height=target_height)
-                if video2.w != target_width or video2.h != target_height:
-                    video2 = video2.resize(width=target_width, height=target_height)
+                print(f"Debug - Normalizing user video")
+                result_norm_user = subprocess.run(cmd_norm_user, capture_output=True, text=True, timeout=300)
                 
-                # Concatenate videos
-                print(f"Debug - Concatenating videos")
-                final_video = mp.concatenate_videoclips([video1, video2])
+                if result_norm_user.returncode != 0:
+                    print(f"Debug - User video normalization failed: {result_norm_user.stderr}")
+                    raise Exception(f"User video normalization failed: {result_norm_user.stderr}")
                 
-                # Generate output filename
-                output_filename = f'merged_youtube_{int(time.time())}.mp4'
-                output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
+                # Normalize YouTube video
+                norm_youtube_path = os.path.join(app.config['UPLOAD_FOLDER'], f'norm_youtube_{int(time.time())}.mp4')
+                cmd_norm_youtube = [
+                    'ffmpeg', '-y',
+                    '-i', youtube_path,
+                    '-c:v', 'libx264',
+                    '-c:a', 'aac',
+                    '-r', '30',
+                    '-s', '1280x720',
+                    '-pix_fmt', 'yuv420p',
+                    '-crf', '23',
+                    '-preset', 'fast',
+                    norm_youtube_path
+                ]
                 
-                print(f"Debug - Writing final video to {output_path}")
-                print(f"Debug - Starting write_videofile with preset 'fast' and progress logger")
+                print(f"Debug - Normalizing YouTube video")
+                result_norm_youtube = subprocess.run(cmd_norm_youtube, capture_output=True, text=True, timeout=300)
                 
-                # Write the final video
-                final_video.write_videofile(
-                    output_path,
-                    codec='libx264',
-                    audio_codec='aac',
-                    bitrate='8000k',
-                    fps=30,
-                    preset='fast', # Changed from slow to fast
-                    threads=4,
-                    ffmpeg_params=[
-                        '-crf', '18',
-                        '-profile:v', 'high',
-                        '-level', '4.0',
-                        '-movflags', '+faststart',
-                        '-pix_fmt', 'yuv420p'
-                    ],
-                    logger='bar' # Add progress bar to console
-                )
+                if result_norm_youtube.returncode != 0:
+                    print(f"Debug - YouTube video normalization failed: {result_norm_youtube.stderr}")
+                    raise Exception(f"YouTube video normalization failed: {result_norm_youtube.stderr}")
                 
-                print(f"Debug - Finished write_videofile")
+                # Update concat file with normalized videos
+                with open(concat_file, 'w', encoding='utf-8') as f:
+                    f.write(f"file '{os.path.abspath(norm_user_path)}'\n")
+                    f.write(f"file '{os.path.abspath(norm_youtube_path)}'\n")
                 
-                print(f"Debug - Cleaning up video objects")
+                print(f"Debug - Created concat file with normalized videos: {concat_file}")
+                print(f"Debug - Output will be saved to: {output_path}")
                 
-                # Close all videos
-                video1.close()
-                video2.close()
-                final_video.close()
+                # Now concatenate the normalized videos
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', concat_file,
+                    '-c', 'copy',  # Safe to copy since videos are normalized
+                    output_path
+                ]
+                
+                print(f"Debug - Running FFmpeg concat command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                
+                print(f"Debug - FFmpeg return code: {result.returncode}")
+                if result.stdout:
+                    print(f"Debug - FFmpeg stdout: {result.stdout}")
+                if result.stderr:
+                    print(f"Debug - FFmpeg stderr: {result.stderr}")
+                
+                if result.returncode != 0:
+                    print(f"Debug - FFmpeg concat failed: {result.stderr}")
+                    raise Exception(f"FFmpeg concat failed: {result.stderr}")
+                
+                # Clean up normalized files
+                for temp_file in [norm_user_path, norm_youtube_path]:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                
+                # Verify output file was created
+                if not os.path.exists(output_path):
+                    raise Exception(f"Output file was not created: {output_path}")
+                
+                output_size = os.path.getsize(output_path)
+                if output_size == 0:
+                    raise Exception(f"Output file is empty: {output_path}")
+                
+                print(f"Debug - Output file created successfully: {output_path} ({output_size} bytes)")
+                
+                # Clean up concat file
+                if os.path.exists(concat_file):
+                    os.remove(concat_file)
+                
+                print(f"Debug - Video merge completed successfully")
                 
                 # Clean up temporary files
                 print(f"Debug - Cleaning up temporary files")
@@ -4868,18 +4877,31 @@ def add_youtube_to_video():
                     'output_file': output_filename
                 })
                 
-            except Exception as e:
-                print(f"Debug - Error during processing: {str(e)}")
-                # Clean up any files that were saved
+            except subprocess.TimeoutExpired:
+                print(f"Debug - FFmpeg timeout during merge")
+                # Clean up files on error
                 if os.path.exists(video_path):
                     os.remove(video_path)
                 if os.path.exists(youtube_path):
                     os.remove(youtube_path)
-                return jsonify({'success': False, 'error': f'Error processing videos: {str(e)}'})
-                
+                return jsonify({'success': False, 'error': 'Video processing timeout'})
+            except Exception as e:
+                print(f"Debug - FFmpeg merge error: {str(e)}")
+                # Clean up files on error
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                if os.path.exists(youtube_path):
+                    os.remove(youtube_path)
+                return jsonify({'success': False, 'error': f'Video merge failed: {str(e)}'})
+        
         except Exception as e:
-            print(f"Debug - Unexpected error in add_youtube_to_video: {str(e)}")
-            return jsonify({'success': False, 'error': f'Unexpected error: {str(e)}'})
+            print(f"Debug - Error during processing: {str(e)}")
+            # Clean up any files that were saved
+            if os.path.exists(video_path):
+                os.remove(video_path)
+            if os.path.exists(youtube_path):
+                os.remove(youtube_path)
+            return jsonify({'success': False, 'error': f'Error processing videos: {str(e)}'})
 
     except Exception as e:
         print(f"Debug - Unexpected error in add_youtube_to_video: {str(e)}")
@@ -5091,69 +5113,70 @@ def merge_with_pexels():
                 
             print(f"Debug - Successfully downloaded Pexels video for merge")
             
-            print(f"Debug - Loading videos for merging")
-            # Load both videos
-            video1 = mp.VideoFileClip(video_path, audio=True)
-            video2 = mp.VideoFileClip(pexels_path, audio=True)
-            videos.extend([video1, video2]) # Add to videos list for cleanup
-            
-            # Get target dimensions (capped at 1080p)
-            target_width = min(max(video1.w, video2.w), 1920)
-            target_height = min(max(video1.h, video2.h), 1080)
-            target_size = (target_width, target_height)
-            
-            print(f"Debug - Processing videos in parallel...")
-            # Process videos in parallel using ThreadPoolExecutor
-            with ThreadPoolExecutor(max_workers=2) as executor:
-                # Submit video processing tasks
-                future1 = executor.submit(process_video_segment, video1, target_size)
-                future2 = executor.submit(process_video_segment, video2, target_size)
-                
-                # Get processed videos
-                processed_video1 = future1.result()
-                processed_video2 = future2.result()
-                processed_videos.extend([processed_video1, processed_video2]) # Add to processed_videos for cleanup
-            
-            print(f"Debug - Concatenating videos...")
-            # Concatenate processed videos
-            final_video = mp.concatenate_videoclips([processed_video1, processed_video2], method="compose")
-            
             # Generate output filename
             output_filename = f'merged_pexels_{int(time.time())}.mp4'
             output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
             
-            print(f"Debug - Writing final video...")
-            print(f"Debug - Starting write_videofile with preset 'ultrafast' and progress logger for Pexels merge")
+            print(f"Debug - Merging videos using FFmpeg")
             
-            # Write the final video with optimized settings
-            final_video.write_videofile(
-                output_path,
-                codec='libx264',
-                audio_codec='aac',
-                bitrate='6000k',
-                fps=30,
-                preset='ultrafast',  # Use ultrafast preset for faster processing
-                threads=8,  # Increased thread count
-                ffmpeg_params=[
-                    '-crf', '23',  # Slightly reduced quality for speed
-                    '-profile:v', 'main',
-                    '-level', '4.0',
-                    '-movflags', '+faststart',
-                    '-pix_fmt', 'yuv420p',
-                    '-tune', 'fastdecode',  # Optimize for fast decoding
-                    '-threads', '8'  # Use 8 threads for encoding
-                ],
-                logger='bar' # Add progress bar
-            )
-            
-            print(f"Debug - Finished write_videofile for Pexels merge")
-            
-            print(f"Debug - Cleaning up video objects and files after Pexels merge")
-            # Close all videos
-            cleanup_videos(videos)
-            cleanup_videos(processed_videos)
-            if final_video:
-                final_video.close()
+            # Use FFmpeg to concatenate videos directly
+            try:
+                # Create a temporary file list for FFmpeg concat
+                concat_file = os.path.join(app.config['UPLOAD_FOLDER'], f'concat_pexels_{int(time.time())}.txt')
+                
+                with open(concat_file, 'w', encoding='utf-8') as f:
+                    f.write(f"file '{os.path.abspath(video_path)}'\n")
+                    f.write(f"file '{os.path.abspath(pexels_path)}'\n")
+                
+                # FFmpeg command to concatenate videos
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', concat_file,
+                    '-c', 'copy',  # Copy streams without re-encoding for speed
+                    '-avoid_negative_ts', 'make_zero',
+                    output_path
+                ]
+                
+                print(f"Debug - Running FFmpeg command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                
+                if result.returncode != 0:
+                    print(f"Debug - FFmpeg concat failed, trying with re-encoding")
+                    # If concat fails, try with re-encoding to ensure compatibility
+                    cmd = [
+                        'ffmpeg', '-y',
+                        '-f', 'concat',
+                        '-safe', '0',
+                        '-i', concat_file,
+                        '-c:v', 'libx264',
+                        '-c:a', 'aac',
+                        '-crf', '23',
+                        '-preset', 'fast',
+                        '-movflags', '+faststart',
+                        '-pix_fmt', 'yuv420p',
+                        output_path
+                    ]
+                    
+                    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                    
+                    if result.returncode != 0:
+                        print(f"Debug - FFmpeg error: {result.stderr}")
+                        raise Exception(f"FFmpeg failed: {result.stderr}")
+                
+                # Clean up concat file
+                if os.path.exists(concat_file):
+                    os.remove(concat_file)
+                
+                print(f"Debug - Pexels video merge completed successfully")
+                
+            except subprocess.TimeoutExpired:
+                print(f"Debug - FFmpeg timeout during Pexels merge")
+                raise Exception("Video processing timeout")
+            except Exception as e:
+                print(f"Debug - FFmpeg merge error: {str(e)}")
+                raise Exception(f"Video merge failed: {str(e)}")
             
             # Clean up temporary files
             cleanup_files(input_paths)
@@ -5364,144 +5387,156 @@ def download_dailymotion_clip():
         output_filename = f'dailymotion_{video_id}_{int(time.time())}.mp4'
         output_path = os.path.join(app.config['OUTPUT_FOLDER'], output_filename)
 
-        # Configure yt-dlp options for Dailymotion
-        ydl_opts = {
-            'format': 'best', # Let yt-dlp pick the best format
-            'outtmpl': output_path,
-            'verbose': True,
-            'no_warnings': False,
-            'ignoreerrors': True,
-            'quiet': False,
-            'no_color': True,
-            'extract_flat': False,
-            'force_generic_extractor': False,
-            'nocheckcertificate': True,
-            'prefer_insecure': True,
-            'geo_bypass': True,
-            'socket_timeout': 60, # Increased socket timeout
-            'retries': 10, # Increased retries for robustness
-            'fragment_retries': 10,
-            'skip_unavailable_fragments': True,
-            'keepvideo': False,
-            'writedescription': False,
-            'writeinfojson': False,
-            'writesubtitles': False,
-            'writeautomaticsub': False,
-            'postprocessors': [],
-            'merge_output_format': 'mp4',
-            'progress_with_newline': True,
-        }
+        # Try multiple configurations for Dailymotion
+        dailymotion_configs = [
+            {
+                'name': 'Standard Config',
+                'opts': {
+                    'format': 'worst[ext=mp4]/worst',
+                    'outtmpl': output_path,
+                    'quiet': True,
+                    'no_warnings': True,
+                    'socket_timeout': 60,
+                    'retries': 5,
+                    'http_headers': {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
+                }
+            },
+            {
+                'name': 'Basic Config',
+                'opts': {
+                    'format': 'worst',
+                    'outtmpl': output_path,
+                    'quiet': True,
+                    'socket_timeout': 30,
+                    'retries': 3,
+                }
+            }
+        ]
 
-        try:
-            print(f"Debug - Starting yt-dlp download to: {output_path}")
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                # First try to extract info to verify the video exists and is downloadable
-                try:
-                    # Try with different URL formats
+        # Try each configuration until one works
+        download_success = False
+        last_error = None
+        
+        for config in dailymotion_configs:
+            try:
+                print(f"Debug - Trying Dailymotion {config['name']}")
+                
+                with yt_dlp.YoutubeDL(config['opts']) as ydl:
+                    # Try different URL formats
                     urls_to_try = [
                         f'https://www.dailymotion.com/video/{video_id}',
-                        f'https://dailymotion.com/video/{video_id}',
-                        f'https://www.dailymotion.com/embed/video/{video_id}'
+                        f'https://dailymotion.com/video/{video_id}'
                     ]
-
-                    info = None
+                    
                     for url in urls_to_try:
                         try:
-                            print(f"Debug - Trying to extract info from: {url}")
-                            info = ydl.extract_info(url, download=False)
-                            if info:
-                                print(f"Debug - Successfully extracted video info from: {url}")
+                            print(f"Debug - Trying URL: {url}")
+                            ydl.download([url])
+                            
+                            # Check if download was successful
+                            if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+                                print(f"Debug - Successfully downloaded with {config['name']}")
+                                download_success = True
                                 break
+                                
                         except Exception as e:
-                            print(f"Debug - Failed to extract info from {url}: {str(e)}")
+                            print(f"Debug - URL {url} failed: {str(e)}")
                             continue
-
-                    if not info:
-                        print(f"Debug - Could not extract video info for {video_id} from any URL format")
-                        return jsonify({'success': False, 'error': 'Video not found or unavailable'})
-
-                except Exception as e:
-                    print(f"Debug - Error extracting video info for {video_id}: {type(e).__name__} - {str(e)}")
-                    return jsonify({'success': False, 'error': f'Error accessing video: {str(e)}'})
-
-                # Now try to download the video
-                try:
-                    print(f"Debug - Initiating download for {video_id}")
-                    # Use the first successful URL or the original one for download
-                    download_url = urls_to_try[0] if info else f'https://www.dailymotion.com/video/{video_id}'
-                    ydl.download([download_url])
-                    print(f"Debug - yt-dlp download process finished for {video_id}")
-                except Exception as e:
-                    print(f"Debug - Error during download for {video_id}: {type(e).__name__} - {str(e)}")
-                    if os.path.exists(output_path):
-                        try:
-                            os.remove(output_path)
-                        except: # nosec
-                            pass
-                    return jsonify({'success': False, 'error': f'Error downloading video: {str(e)}'})
-
-            # Verify the downloaded file
-            if not os.path.exists(output_path):
-                print(f"Debug - Output file not found after download at {output_path}")
-                return jsonify({'success': False, 'error': 'Failed to download video: Output file not created.'})
-
-            if os.path.getsize(output_path) == 0:
-                print(f"Debug - Downloaded file is empty at {output_path}")
-                os.remove(output_path)
-                return jsonify({'success': False, 'error': 'Downloaded video file is empty.'})
-
-            print(f"Debug - Successfully downloaded Dailymotion clip to {output_path}")
-
-            # --- NEW: Re-encode video for browser compatibility ---
-            try:
-                print(f"Debug - Loading downloaded Dailymotion clip for re-encoding: {output_path}")
-                clip = mp.VideoFileClip(output_path)
-
-                # Define temporary re-encoded path
-                reencoded_filename = f'reencoded_dailymotion_{int(time.time())}.mp4'
-                reencoded_path = os.path.join(app.config['OUTPUT_FOLDER'], reencoded_filename)
-
-                print(f"Debug - Re-encoding Dailymotion clip to: {reencoded_path}")
-                clip.write_videofile(
-                    reencoded_path,
-                    codec='libx264',
-                    audio_codec='aac',
-                    bitrate='3000k', # Adjust bitrate as needed for quality vs file size
-                    fps=clip.fps, # Preserve original FPS
-                    preset='medium', # Use a balanced preset for quality and speed
-                    threads=4,
-                    ffmpeg_params=[
-                        '-movflags', '+faststart', # For faster web playback
-                        '-pix_fmt', 'yuv420p', # Essential for broad browser compatibility
-                        '-crf', '23' # Constant Rate Factor: 23 is a good balance
-                    ]
-                )
-                clip.close()
-                os.remove(output_path) # Remove the original downloaded file
-                output_filename = reencoded_filename # Use the re-encoded filename for output
-                print(f"Debug - Successfully re-encoded Dailymotion clip to: {output_filename}")
+                    
+                    if download_success:
+                        break
+                        
             except Exception as e:
-                print(f"Debug - Error during Dailymotion re-encoding: {str(e)}")
-                if os.path.exists(output_path): os.remove(output_path) # Clean up original if re-encoding fails
-                return jsonify({'success': False, 'error': f'Error re-encoding video for browser: {str(e)}'})
-            # --- END NEW RE-ENCODE ---
+                print(f"Debug - {config['name']} failed: {str(e)}")
+                last_error = str(e)
+                # Clean up any partial download
+                if os.path.exists(output_path):
+                    try:
+                        os.remove(output_path)
+                    except:
+                        pass
+                continue
+        
+        if not download_success:
+            print(f"Debug - All Dailymotion download methods failed")
+            return jsonify({'success': False, 'error': f'Failed to download Dailymotion video. Last error: {last_error}'})
+        
+        print(f"Debug - Dailymotion video downloaded successfully")
+        
+        # Verify the downloaded file
+        if not os.path.exists(output_path):
+            print(f"Debug - Output file not found after download at {output_path}")
+            return jsonify({'success': False, 'error': 'Failed to download video: Output file not created.'})
 
-            return jsonify({
-                'success': True,
-                'filename': output_filename # Return the re-encoded filename
-            })
+        if os.path.getsize(output_path) == 0:
+            print(f"Debug - Downloaded file is empty at {output_path}")
+            os.remove(output_path)
+            return jsonify({'success': False, 'error': 'Downloaded video file is empty.'})
 
+        print(f"Debug - Successfully downloaded Dailymotion clip to {output_path}")
+
+        # --- NEW: Re-encode video for browser compatibility using FFmpeg ---
+        try:
+            print(f"Debug - Re-encoding downloaded Dailymotion clip for browser compatibility: {output_path}")
+            
+            # Define temporary re-encoded path
+            reencoded_filename = f'reencoded_dailymotion_{int(time.time())}.mp4'
+            reencoded_path = os.path.join(app.config['OUTPUT_FOLDER'], reencoded_filename)
+
+            print(f"Debug - Re-encoding Dailymotion clip to: {reencoded_path}")
+            
+            # Use FFmpeg to re-encode for browser compatibility
+            cmd = [
+                'ffmpeg', '-y',
+                '-i', output_path,
+                '-c:v', 'libx264',
+                '-c:a', 'aac',
+                '-b:v', '3000k',  # Video bitrate
+                '-crf', '23',     # Constant Rate Factor
+                '-preset', 'medium',
+                '-movflags', '+faststart',  # For faster web playback
+                '-pix_fmt', 'yuv420p',      # Essential for broad browser compatibility
+                reencoded_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+            
+            if result.returncode != 0:
+                print(f"Debug - FFmpeg re-encoding error: {result.stderr}")
+                raise Exception(f"FFmpeg re-encoding failed: {result.stderr}")
+            
+            # Remove the original downloaded file and use re-encoded version
+            os.remove(output_path)
+            output_filename = reencoded_filename
+            print(f"Debug - Successfully re-encoded Dailymotion clip to: {output_filename}")
+            
+        except subprocess.TimeoutExpired:
+            print(f"Debug - FFmpeg timeout during Dailymotion re-encoding")
+            if os.path.exists(output_path): 
+                os.remove(output_path)
+            return jsonify({'success': False, 'error': 'Video re-encoding timeout'})
         except Exception as e:
-            print(f"Debug - yt-dlp execution error for {video_id}: {str(e)}")
-            if os.path.exists(output_path):
-                try:
-                    os.remove(output_path)
-                except: # nosec
-                    pass
-            return jsonify({'success': False, 'error': f'Error processing download: {str(e)}'})
+            print(f"Debug - Error during Dailymotion re-encoding: {str(e)}")
+            if os.path.exists(output_path): 
+                os.remove(output_path)
+            return jsonify({'success': False, 'error': f'Error re-encoding video for browser: {str(e)}'})
+        # --- END NEW RE-ENCODE ---
+
+        return jsonify({
+            'success': True,
+            'filename': output_filename,  # Return the re-encoded filename
+            'video_id': video_id  # Also return video_id for easier matching
+        })
 
     except Exception as e:
         print(f"Debug - General error in download_dailymotion_clip: {str(e)}")
+        if os.path.exists(output_path):
+            try:
+                os.remove(output_path)
+            except: # nosec
+                pass
         return jsonify({'success': False, 'error': f'Unexpected error: {str(e)}'})
 
 @app.route('/add-dailymotion-to-video', methods=['POST'])
@@ -5513,70 +5548,198 @@ def add_dailymotion_to_video():
         
         video_file = request.files['video']
         dailymotion_filename = request.form.get('dailymotion_filename')
+        video_id = request.form.get('video_id')  # Also try to get video_id directly
         
-        if not dailymotion_filename:
-            return jsonify({'success': False, 'error': 'No Dailymotion filename provided'})
+        if not dailymotion_filename and not video_id:
+            return jsonify({'success': False, 'error': 'No Dailymotion filename or video ID provided'})
         
-        # Get the paths for both videos
-        dailymotion_path = get_output_path(dailymotion_filename)
-        if not os.path.exists(dailymotion_path):
-            return jsonify({'success': False, 'error': 'Dailymotion video not found'})
+        # Use video_id if available, otherwise use dailymotion_filename as video_id
+        search_term = video_id if video_id else dailymotion_filename
+        print(f"Debug - Looking for Dailymotion file with search term: {search_term}")
+        print(f"Debug - dailymotion_filename: {dailymotion_filename}")
+        print(f"Debug - video_id: {video_id}")
+        dailymotion_path = None
+        
+        # Search for Dailymotion files in output folder
+        output_folder = app.config['OUTPUT_FOLDER']
+        print(f"Debug - Searching in output folder: {output_folder}")
+        
+        if os.path.exists(output_folder):
+            files = os.listdir(output_folder)
+            print(f"Debug - Files in output folder: {files}")
+            
+            # Look for files that match the search term pattern
+            matching_files = []
+            for file in files:
+                if file.endswith('.mp4') and (
+                    f'dailymotion_{search_term}' in file or  # Original download pattern
+                    f'reencoded_dailymotion' in file or      # Re-encoded pattern
+                    search_term in file or                   # Search term anywhere in filename
+                    dailymotion_filename == file             # Exact filename match
+                ):
+                    matching_files.append(file)
+                    print(f"Debug - Found matching file: {file}")
+            
+            # Prefer re-encoded files, then original downloads
+            if matching_files:
+                # Sort to prefer reencoded files first, then exact matches
+                matching_files.sort(key=lambda x: (
+                    0 if 'reencoded_dailymotion' in x else
+                    1 if f'dailymotion_{search_term}' in x else
+                    2 if search_term in x else
+                    3
+                ))
+                
+                selected_file = matching_files[0]
+                dailymotion_path = os.path.join(output_folder, selected_file)
+                print(f"Debug - Selected Dailymotion file: {selected_file}")
+            
+        if not dailymotion_path or not os.path.exists(dailymotion_path):
+            return jsonify({
+                'success': False, 
+                'error': f'Dailymotion video not found for search term: {search_term}. Please download the video first.',
+                'search_term': search_term,
+                'dailymotion_filename': dailymotion_filename,
+                'available_files': files if 'files' in locals() else []
+            })
         
         # Save the uploaded video temporarily
         temp_video_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(video_file.filename))
         video_file.save(temp_video_path)
         
         try:
-            # Load both videos with high quality settings
-            main_video = mp.VideoFileClip(temp_video_path, audio=True)
-            dailymotion_video = mp.VideoFileClip(dailymotion_path, audio=True)
-            
-            # Ensure both videos have the same resolution (use the higher resolution)
-            target_width = max(main_video.w, dailymotion_video.w)
-            target_height = max(main_video.h, dailymotion_video.h)
-            
-            # Resize videos if needed while maintaining aspect ratio
-            if main_video.w != target_width or main_video.h != target_height:
-                main_video = main_video.resize(width=target_width, height=target_height)
-            if dailymotion_video.w != target_width or dailymotion_video.h != target_height:
-                dailymotion_video = dailymotion_video.resize(width=target_width, height=target_height)
-            
-            # Concatenate videos
-            final_video = mp.concatenate_videoclips([main_video, dailymotion_video])
-            
             # Generate output filename
             timestamp = int(time.time())
-            output_filename = f'merged_{timestamp}.mp4'
+            output_filename = f'merged_dailymotion_{timestamp}.mp4'
             output_path = get_output_path(output_filename)
             
-            # Write the final video with high quality settings
-            final_video.write_videofile(
-                output_path,
-                codec='libx264',
-                audio_codec='aac',
-                bitrate='8000k',  # High bitrate for better quality
-                fps=30,  # Maintain high frame rate
-                preset='slow',  # Better compression quality
-                threads=4,  # Use multiple threads for faster processing
-                ffmpeg_params=[
-                    '-crf', '18',  # Constant Rate Factor (lower = better quality, 18 is visually lossless)
-                    '-movflags', '+faststart',  # Enable fast start for web playback
-                    '-pix_fmt', 'yuv420p'  # Ensure compatibility with most players
+            print(f"Debug - Merging Dailymotion video using FFmpeg")
+            
+            # Use FFmpeg to concatenate videos directly
+            try:
+                # Verify input files exist and have content
+                print(f"Debug - Verifying input files:")
+                print(f"  User video: {temp_video_path} (exists: {os.path.exists(temp_video_path)}, size: {os.path.getsize(temp_video_path) if os.path.exists(temp_video_path) else 0} bytes)")
+                print(f"  Dailymotion video: {dailymotion_path} (exists: {os.path.exists(dailymotion_path)}, size: {os.path.getsize(dailymotion_path) if os.path.exists(dailymotion_path) else 0} bytes)")
+                
+                # Create a temporary file list for FFmpeg concat
+                concat_file = os.path.join(app.config['UPLOAD_FOLDER'], f'concat_dailymotion_{timestamp}.txt')
+                
+                # First, normalize both videos to ensure compatibility
+                print(f"Debug - Normalizing videos for compatibility")
+                
+                # Normalize user video
+                norm_user_path = os.path.join(app.config['UPLOAD_FOLDER'], f'norm_user_dm_{timestamp}.mp4')
+                cmd_norm_user = [
+                    'ffmpeg', '-y',
+                    '-i', temp_video_path,
+                    '-c:v', 'libx264',
+                    '-c:a', 'aac',
+                    '-r', '30',
+                    '-s', '1280x720',
+                    '-pix_fmt', 'yuv420p',
+                    '-crf', '23',
+                    '-preset', 'fast',
+                    norm_user_path
                 ]
-            )
-            
-            # Clean up
-            final_video.close()
-            main_video.close()
-            dailymotion_video.close()
-            
-            # Remove temporary files
-            cleanup_files([temp_video_path, dailymotion_path])
-            
-            return jsonify({
-                'success': True,
-                'filename': output_filename
-            })
+                
+                print(f"Debug - Normalizing user video")
+                result_norm_user = subprocess.run(cmd_norm_user, capture_output=True, text=True, timeout=300)
+                
+                if result_norm_user.returncode != 0:
+                    print(f"Debug - User video normalization failed: {result_norm_user.stderr}")
+                    raise Exception(f"User video normalization failed: {result_norm_user.stderr}")
+                
+                # Normalize Dailymotion video
+                norm_dailymotion_path = os.path.join(app.config['UPLOAD_FOLDER'], f'norm_dailymotion_{timestamp}.mp4')
+                cmd_norm_dailymotion = [
+                    'ffmpeg', '-y',
+                    '-i', dailymotion_path,
+                    '-c:v', 'libx264',
+                    '-c:a', 'aac',
+                    '-r', '30',
+                    '-s', '1280x720',
+                    '-pix_fmt', 'yuv420p',
+                    '-crf', '23',
+                    '-preset', 'fast',
+                    norm_dailymotion_path
+                ]
+                
+                print(f"Debug - Normalizing Dailymotion video")
+                result_norm_dailymotion = subprocess.run(cmd_norm_dailymotion, capture_output=True, text=True, timeout=300)
+                
+                if result_norm_dailymotion.returncode != 0:
+                    print(f"Debug - Dailymotion video normalization failed: {result_norm_dailymotion.stderr}")
+                    raise Exception(f"Dailymotion video normalization failed: {result_norm_dailymotion.stderr}")
+                
+                # Update concat file with normalized videos
+                with open(concat_file, 'w', encoding='utf-8') as f:
+                    f.write(f"file '{os.path.abspath(norm_user_path)}'\n")
+                    f.write(f"file '{os.path.abspath(norm_dailymotion_path)}'\n")
+                
+                print(f"Debug - Created concat file with normalized videos: {concat_file}")
+                print(f"Debug - Output will be saved to: {output_path}")
+                
+                # Now concatenate the normalized videos
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', concat_file,
+                    '-c', 'copy',  # Safe to copy since videos are normalized
+                    output_path
+                ]
+                
+                print(f"Debug - Running FFmpeg concat command: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                
+                print(f"Debug - FFmpeg return code: {result.returncode}")
+                if result.stdout:
+                    print(f"Debug - FFmpeg stdout: {result.stdout}")
+                if result.stderr:
+                    print(f"Debug - FFmpeg stderr: {result.stderr}")
+                
+                if result.returncode != 0:
+                    print(f"Debug - FFmpeg concat failed: {result.stderr}")
+                    raise Exception(f"FFmpeg concat failed: {result.stderr}")
+                
+                # Clean up normalized files
+                for temp_file in [norm_user_path, norm_dailymotion_path]:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                
+                # Verify output file was created
+                if not os.path.exists(output_path):
+                    raise Exception(f"Output file was not created: {output_path}")
+                
+                output_size = os.path.getsize(output_path)
+                if output_size == 0:
+                    raise Exception(f"Output file is empty: {output_path}")
+                
+                print(f"Debug - Output file created successfully: {output_path} ({output_size} bytes)")
+                
+                # Clean up concat file
+                if os.path.exists(concat_file):
+                    os.remove(concat_file)
+                
+                print(f"Debug - Dailymotion video merge completed successfully")
+                
+                # Remove temporary files
+                cleanup_files([temp_video_path])
+                
+                return jsonify({
+                    'success': True,
+                    'filename': output_filename
+                })
+                
+            except subprocess.TimeoutExpired:
+                print(f"Debug - FFmpeg timeout during Dailymotion merge")
+                cleanup_files([temp_video_path])
+                return jsonify({'success': False, 'error': 'Video processing timeout'})
+            except Exception as e:
+                print(f"Debug - FFmpeg merge error: {str(e)}")
+                cleanup_files([temp_video_path])
+                return jsonify({'success': False, 'error': f'Video merge failed: {str(e)}'})
             
         except Exception as e:
             print(f"Error in video processing: {str(e)}")
